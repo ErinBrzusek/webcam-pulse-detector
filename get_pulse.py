@@ -1,4 +1,4 @@
-from lib.FLIR import Camera
+from lib.device import Camera
 from lib.processors_noopenmdao import findFaceGetPulse
 from lib.interface import plotXY, imshow, waitKey, destroyWindow
 from cv2 import moveWindow
@@ -49,7 +49,7 @@ class getPulseApp(object):
                  socket.SOCK_DGRAM) # UDP
 
         self.cameras = []
-        self.selected_cam = 0
+        self.selected_cam = 1 #CHANGE TO ZERO IF BROKEN
         for i in range(3):
             camera = Camera(camera=i)  # first camera by default
             if camera.valid or not len(self.cameras):
