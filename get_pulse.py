@@ -1,4 +1,4 @@
-from lib.device import Camera
+from lib.FLIR import Camera
 from lib.processors_noopenmdao import findFaceGetPulse
 from lib.interface import plotXY, imshow, waitKey, destroyWindow
 from cv2 import moveWindow
