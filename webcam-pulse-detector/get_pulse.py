@@ -5,10 +5,13 @@ from cv2 import moveWindow
 import argparse
 import numpy as np
 import datetime
-#TODO: work on serial port comms, if anyone asks for it
-#from serial import Serial
 import socket
 import sys
+
+# ADDED CODE
+import pandas as pd
+import time
+# END OF ADDED CODE
 
 class getPulseApp(object):
 
@@ -27,6 +30,15 @@ class getPulseApp(object):
         baud = args.baud
         self.send_serial = False
         self.send_udp = False
+        
+        # ADDED CODE
+        self.bpm_data = pd.DataFrame(columns = ['Timestamp', 'BPM'])
+        
+        self.face_detected_time = None
+        self.face_locked_time = None
+        self.face_locked = None
+        # END OF ADDED CODE
+        
         if serial:
             self.send_serial = True
             if not baud:
@@ -107,9 +119,33 @@ class getPulseApp(object):
         Locking the forehead location in place significantly improves
         data quality, once a forehead has been sucessfully isolated.
         """
-        #state = self.processor.find_faces.toggle()
-        state = self.processor.find_faces_toggle()
-        print("face detection lock =", not state)
+        # ADDED CODE
+        current_time = time.time()
+        
+        if self.processor.find_faces:
+            if self.face_detected_time is None:
+                self.face_detected_time = current_time
+                print("Face detection started, locking in 10 sec")
+            else:
+                elapsed_time = current_time - self.face_detected_time
+                if not self.face_locked and elapsed_time > 10:
+                    self.processor.find_faces_toggle()
+                    self.face_locked = True
+                    self.face_locked_time = time.time()
+                    print("Time Locked", self.face_locked_time)
+                    print("Face locked")
+                elif self.face_locked and elapsed_time > 20:
+                    print("Face Unlocked")
+                    self.processor.find_faces_toggle()
+                    self.face_detected_time = None
+                    self.face_locked_time = None
+                    self.face_locked = False
+                    
+        # END OF ADDED CODE
+        
+        # ORIGINAL CODE
+        #state = self.processor.find_faces_toggle()
+        #print("face detection lock =", not state)
 
     def toggle_display_plot(self):
         """
@@ -154,6 +190,17 @@ class getPulseApp(object):
         self.pressed = waitKey(10) & 255  # wait for keypress for 10 ms
         if self.pressed == 27:  # exit program on 'esc'
             print("Exiting")
+            
+            # ADDED CODE
+            max_bpm = self.bpm_data['BPM'].max()
+            max_bpm_df = pd.DataFrame({'Max BPM': [max_bpm]})
+            
+            filename = "max_bpm_" + str(datetime.datetime.now()).replace(":", "_").replace(".", "_") + ".csv"
+            max_bpm_df.to_csv(filename, index=False)
+            print(f"Pulse data saved to {filename}")
+            # END OF ADDED CODE
+            
+            
             for cam in self.cameras:
                 cam.cam.release()
             if self.send_serial:
@@ -171,29 +218,54 @@ class getPulseApp(object):
         # Get current image frame from the camera
         frame = self.cameras[self.selected_cam].get_frame()
         self.h, self.w, _c = frame.shape
-
-        # display unaltered frame
-        # imshow("Original",frame)
-
         # set current image frame to the processor's input
         self.processor.frame_in = frame
         # process the image frame to perform all needed analysis
         self.processor.run(self.selected_cam)
         # collect the output frame for display
         output_frame = self.processor.frame_out
+        
+        # ADDED CODE
+        self.toggle_search()
+        # END OF ADDED CODE
 
-        # show the processed/annotated output frame
+        # show the processed/annotated output frame`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
         imshow("Processed", output_frame)
 
         # create and/or update the raw data display if needed
         if self.bpm_plot:
             self.make_bpm_plot()
+            
+        # ADDED CODE
+        new_data = pd.DataFrame({
+        'Timestamp': [datetime.datetime.now()],
+        'BPM': [self.processor.bpm]
+        })
+        self.bpm_data = pd.concat([self.bpm_data, new_data], ignore_index = True)
+        # END OF ADDED CODE
 
         if self.send_serial:
             self.serial.write(str(self.processor.bpm) + "\r\n")
 
         if self.send_udp:
             self.sock.sendto(str(self.processor.bpm), self.udp)
+            
+        # ADDED CODE
+        elapsed_time = time.time() - self.face_detected_time
+        if self.face_locked and elapsed_time > 40:
+            print("Face Unlocked")
+            self.processor.find_faces_toggle()
+            self.face_detected_time = None
+            self.face_locked_time = None
+            self.face_locked = False
+            
+            bpm = self.bpm_data['BPM'].max()
+            bpm_df = pd.DataFrame({'BPM': [bpm]})
+            
+            filename = "bpm_" + str(datetime.datetime.now()).replace(":", "_").replace(".", "_") + ".csv"
+            bpm_df.to_csv(filename, index=False)
+            print(f"Pulse data saved to {filename}")
+        # END OF ADDED CODE
 
         # handle any key presses
         self.key_handler()

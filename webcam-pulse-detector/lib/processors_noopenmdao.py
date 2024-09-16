@@ -21,6 +21,10 @@ class findFaceGetPulse(object):
 
     def __init__(self, bpm_limits=[], data_spike_limit=250,
                  face_detector_smoothness=10):
+                     
+        # ADDED CODE
+        self.pulse_data = []
+        # END OF ADDED CODE
 
         self.frame_in = np.zeros((10, 10))
         self.frame_out = np.zeros((10, 10))
@@ -50,7 +54,7 @@ class findFaceGetPulse(object):
 
         self.idx = 1
         self.find_faces = True
-
+        
     def find_faces_toggle(self):
         self.find_faces = not self.find_faces
         return self.find_faces
